@@ -95,6 +95,7 @@ fitARIMA <- arima(train_ts, order=c(1,1,1),seasonal = list(order = c(1,0,0), per
 print(fitARIMA)
 coeftest(fitARIMA)
 ```
+
 ```{r}
 confint(fitARIMA)
 ```
@@ -105,12 +106,12 @@ auto.arima(train_ts, trace=TRUE)
 # Forecasting using an ARIMA model
 The predict() function is utilized to generate predictions from the outcomes of different model fitting functions. To indicate the number of time steps to forecast, the function accepts an argument n.ahead().
 ```{r}
-predict(fitARIMA,n.ahead = 5)
+predict(Arima(train_ts, order=c(1,0,0)),n.ahead = 5)
 ```
 
-The forecast R package has a function named forecast.Arima() which can be utilized to make predictions for upcoming values of a time series. Additionally, the level argument can be used to indicate the desired level of confidence for the prediction intervals.
+The forecast R package has a function named forecast.Arima() which can be utilized to make predictions for upcoming values of a time series. 
 ```{r}
-(fit <- Arima(train_ts, order=c(3,1,1)))
+(fit <- Arima(train_ts, order=c(1,0,0)))
 ```
 
 We need to make sure that the forecast errors are not correlated, normally distributed with mean zero and constant variance. We can use the diagnostic measure to find out the appropriate model with best possible forecast values.
@@ -129,4 +130,3 @@ We can see whether the model is close to invertibility or stationarity by a plot
 autoplot(fit)
 ```
 The left-hand plot exhibits three red dots that are associated with the roots of the polynomials $\phi(B)$, whereas the red dot in the right-hand plot corresponds to the root of $\theta(B)$. As expected, since R ensures that the fitted model is stationary and invertible, all these dots are situated inside the unit circle. However, any roots that lie close to the unit circle may suffer from numerical instability, which implies that the corresponding model will not be appropriate for forecasting purposes.
-
