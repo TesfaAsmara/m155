@@ -10,6 +10,7 @@ library(forecast)
 library(fUnitRoots)
 library(lmtest)
 library(ggplot2)
+library(TSA)
 ```
 
 
@@ -51,11 +52,43 @@ test_ts <- ts(data = test_data$meantemp, start=c(2016,10),end=c(2017,4), frequen
 ```
 
 ```{r}
+# To help find the starts and ends of the dates of the train and test sets
 print(start)
 print(middle)
 print(end)
 autoplot(train_ts)
 ```
+
+```{r}
+## First non-seasonal difference of sales
+#diff1 <- diff(train_ts, differences = 1)
+## Seasonal difference of sales
+#diff12 <- diff(train_ts, differences = 1, lag = 12)
+## Second difference of sales
+#diff2 <- diff(train_ts, differences = 2)
+#
+## ARMA-Subsets for first non-seasonal difference 
+#res1=armasubsets(diff1,nar=15,nma=15)
+#plot(res1)
+#
+## ARMA-Subsets for seasonal difference 
+#res2=armasubsets(diff12,nar=15,nma=15)
+#plot(res2)
+#
+## ARMA-Subsets for second difference 
+#res3=armasubsets(diff2,nar=15,nma=15)
+#plot(res3)
+#
+## EACF for first non-seasonal difference 
+#eacf(diff1)
+#
+## EACF for seasonal difference
+#eacf(diff12)
+#
+## EACF for second difference
+#eacf(diff2)
+```
+
 
 ```{r}
 components.ts = decompose(train_ts)
@@ -85,10 +118,20 @@ timeseriesseasonallyadjusted <- train_ts - components.ts$seasonal
 tsstationary <- diff(timeseriesseasonallyadjusted, differences=1)
 plot(tsstationary)
 ```
+
 ```{r}
 acf(tsstationary, lag.max=34)
 pacf(tsstationary, lag.max=34)
 ```
+
+We then run ARMA-Subsets and EACF to see if there are any clear candidate models.  The ARMA-Subsets table indicates that AR(1),AR(2),AR(3),AR(4),AR(11) and MA(1),MA(2),MA(3), and MA(11) are all possible models. Our set of possible models is a combination of these ARMA values, with $d = 1$.
+
+```{r}
+res=armasubsets(tsstationary,nar=15,nma=15)
+plot(res)
+eacf(tsstationary)
+```
+This is a recursive process and we need to run this arima() function with different (p,d,q) values to find out the most optimized and efficient model.
 
 ```{r}
 fitARIMA <- arima(train_ts, order=c(1,1,1),seasonal = list(order = c(1,0,0), period = 12),method="ML")
@@ -100,11 +143,14 @@ coeftest(fitARIMA)
 confint(fitARIMA)
 ```
 The forecast package in R provides functions for automatically selecting exponential and ARIMA models: ets() and auto.arima(). The auto.arima() function uses unit root tests and the AIC and MLE to select an ARIMA model. The number of differences (d) is determined using the KPSS test in the Hyndman-Khandakar algorithm. The p, d, and q values are chosen by minimizing the AICc. The algorithm searches the model space to select the model with the smallest AICc. The constant c is included if d=0, and set to zero if d≥1. The algorithm considers variations on the current model by changing p and/or q and including/excluding c. The best model is selected and the process is repeated until no lower AIC can be found.
+
 ```{r}
 auto.arima(train_ts, trace=TRUE)
 ```
+
 # Forecasting using an ARIMA model
 The predict() function is utilized to generate predictions from the outcomes of different model fitting functions. To indicate the number of time steps to forecast, the function accepts an argument n.ahead().
+
 ```{r}
 predict(Arima(train_ts, order=c(1,0,0)),n.ahead = 5)
 ```
