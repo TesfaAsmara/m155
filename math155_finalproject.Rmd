@@ -110,6 +110,9 @@ plot(tsstationary)
 ```{r}
 acf(train_ts,lag.max=34) 
 ```
+The autocorrelation function (acf()) gives the autocorrelation at all possible lags. The autocorrelation at lag 0 is included by default which always takes the value 1 as it represents the correlation between the data and themselves. As we can infer from the graph above, the autocorrelation continues to decrease as the lag increases, confirming that there is no linear association between observations separated by larger lags.
+
+
 To remove seasonality from the data, we subtract the seasonal component from the original series and then difference it to make it stationary.
 
 After removing seasonality and making the data stationary, it will look like:
