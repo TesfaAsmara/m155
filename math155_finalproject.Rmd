@@ -1,0 +1,132 @@
+---
+title: "math155_finalproject"
+output: pdf_document
+date: "2023-04-18"
+---
+
+```{r}
+library(zoo)
+library(forecast)
+library(fUnitRoots)
+library(lmtest)
+library(ggplot2)
+```
+
+
+```{r}
+# read in CSV file
+data <- read.csv("DailyDelhiClimateTrain.csv", header = TRUE)
+
+# convert to time series object
+ts_data <- read.zoo(data, format = "%Y-%m-%d")
+
+# split into train and test sets
+train_size <- floor(nrow(ts_data) * 0.95) # set train size to 95% of the data
+train_data <- ts_data[1:train_size,]
+test_data <- ts_data[(train_size+1):nrow(ts_data),]
+
+date = start(train_data)
+date_str <- format(date, "%Y-%m-%d")
+date_parts <- strsplit(date_str, "-")[[1]]
+year <- as.integer(date_parts[1])
+month <- as.integer(date_parts[2])
+start <- c(year, month)
+
+date = start(test_data)
+date_str <- format(date, "%Y-%m-%d")
+date_parts <- strsplit(date_str, "-")[[1]]
+year <- as.integer(date_parts[1])
+month <- as.integer(date_parts[2])
+middle <- c(year, month)
+
+date = end(test_data)
+date_str <- format(date, "%Y-%m-%d")
+date_parts <- strsplit(date_str, "-")[[1]]
+year <- as.integer(date_parts[1])
+month <- as.integer(date_parts[2])
+end<- c(year, month)
+
+train_ts <- ts(data = train_data$meantemp, start=c(2013,1), end=c(2016,10), frequency=365)
+test_ts <- ts(data = test_data$meantemp, start=c(2016,10),end=c(2017,4), frequency=365)
+```
+
+```{r}
+print(start)
+print(middle)
+print(end)
+autoplot(train_ts)
+```
+
+```{r}
+components.ts = decompose(train_ts)
+plot(components.ts)
+```
+Here we get 4 components:
+
+Observed – the actual data plot
+Trend – the overall upward or downward movement of the data points
+Seasonal – any monthly/yearly pattern of the data points
+Random – unexplainable part of the data
+
+```{r}
+urkpssTest(train_ts, type = c("tau"), lags = c("short"),use.lag = NULL, doplot = TRUE)
+tsstationary = diff(train_ts, differences=1)
+plot(tsstationary)
+```
+
+```{r}
+acf(train_ts,lag.max=34) 
+```
+To remove seasonality from the data, we subtract the seasonal component from the original series and then difference it to make it stationary.
+
+After removing seasonality and making the data stationary, it will look like:
+```{r}
+timeseriesseasonallyadjusted <- train_ts - components.ts$seasonal
+tsstationary <- diff(timeseriesseasonallyadjusted, differences=1)
+plot(tsstationary)
+```
+```{r}
+acf(tsstationary, lag.max=34)
+pacf(tsstationary, lag.max=34)
+```
+
+```{r}
+fitARIMA <- arima(train_ts, order=c(1,1,1),seasonal = list(order = c(1,0,0), period = 12),method="ML")
+print(fitARIMA)
+coeftest(fitARIMA)
+```
+```{r}
+confint(fitARIMA)
+```
+The forecast package in R provides functions for automatically selecting exponential and ARIMA models: ets() and auto.arima(). The auto.arima() function uses unit root tests and the AIC and MLE to select an ARIMA model. The number of differences (d) is determined using the KPSS test in the Hyndman-Khandakar algorithm. The p, d, and q values are chosen by minimizing the AICc. The algorithm searches the model space to select the model with the smallest AICc. The constant c is included if d=0, and set to zero if d≥1. The algorithm considers variations on the current model by changing p and/or q and including/excluding c. The best model is selected and the process is repeated until no lower AIC can be found.
+```{r}
+auto.arima(train_ts, trace=TRUE)
+```
+# Forecasting using an ARIMA model
+The predict() function is utilized to generate predictions from the outcomes of different model fitting functions. To indicate the number of time steps to forecast, the function accepts an argument n.ahead().
+```{r}
+predict(fitARIMA,n.ahead = 5)
+```
+
+The forecast R package has a function named forecast.Arima() which can be utilized to make predictions for upcoming values of a time series. Additionally, the level argument can be used to indicate the desired level of confidence for the prediction intervals.
+```{r}
+(fit <- Arima(train_ts, order=c(3,1,1)))
+```
+
+We need to make sure that the forecast errors are not correlated, normally distributed with mean zero and constant variance. We can use the diagnostic measure to find out the appropriate model with best possible forecast values.
+```{r}
+checkresiduals(fit)
+```
+
+```{r}
+p <-forecast(fit)
+autoplot(p$upper)+autolayer(p$lower)+autolayer(p$mean)+autolayer(test_ts)+autolayer(train_ts)
+```
+
+We can see whether the model is close to invertibility or stationarity by a plot of the roots in relation to the complex unit circle. It is easier to plot the inverse roots instead, as they should all lie within the unit circle.
+
+```{r}
+autoplot(fit)
+```
+The left-hand plot exhibits three red dots that are associated with the roots of the polynomials $\phi(B)$, whereas the red dot in the right-hand plot corresponds to the root of $\theta(B)$. As expected, since R ensures that the fitted model is stationary and invertible, all these dots are situated inside the unit circle. However, any roots that lie close to the unit circle may suffer from numerical instability, which implies that the corresponding model will not be appropriate for forecasting purposes.
+
